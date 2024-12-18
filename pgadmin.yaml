@@ -1,0 +1,66 @@
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgadmin-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pgadmin
+  template:
+    metadata:
+      labels:
+        app: pgadmin
+    spec:
+      containers:
+        - name: pgadmin
+          image: dpage/pgadmin4:latest
+          imagePullPolicy: IfNotPresent
+          resources:
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+            requests:
+              memory: "128Mi"
+              cpu: "125m"
+          env:
+            - name: PGADMIN_DEFAULT_EMAIL
+              value: admin@example.com
+            - name: PGADMIN_DEFAULT_PASSWORD
+              value: admin
+          ports:
+            - containerPort: 80
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgadmin
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+  selector:
+    app: pgadmin
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: pgadmin-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: pgadmin.idsa.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pgadmin
+                port:
+                  number: 80

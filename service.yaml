@@ -1,0 +1,98 @@
+# ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hello-app-config
+data:
+  SERVER_PORT: "8080"
+  POSTGRES_HOST: "postgres"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "postgres"
+  POSTGRES_USER: "admin"
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: hello-app
+  template:
+    metadata:
+      labels:
+        app: hello-app
+    spec:
+      containers:
+        - name: hello-app
+          image: aigulmndzh/helloapp:latest
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: hello-app-config
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: hello-app-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_CONN
+              value: "postgres://admin:admin@postgres:5432/postgres"
+            # - name: POSTGRES_DB_DSN
+            #   value: "host=localhost port=5432 user=admin password=admin dbname=postgres sslmode=disable"
+            - name: SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: hello-app-config
+                  key: SERVER_PORT
+          ports:
+            - containerPort: 8080
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-app
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: hello-app
+---
+# Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: helloapp-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: helloapp.idsa.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hello-app
+                port:
+                  number: 8080
